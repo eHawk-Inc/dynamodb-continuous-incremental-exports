@@ -689,6 +689,9 @@ export class NodeBuilder {
                 snsMessage: {
                     message: `${ExportType[exportType]} export for table \'${this.sourceDynamoDbTable.tableName}\' succeeded`,
                     'executionId.$': '$$.Execution.Id',
+                    sourceDynamoDbTable: this.sourceDynamoDbTable.tableName,
+                    targetBucket: this.sourceDataExportBucket.bucket,
+                    targetBucketPrefix: this.sourceDataExportBucket.prefix,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_SUCCESS,
                     ...timeParamSuccess,
@@ -705,6 +708,9 @@ export class NodeBuilder {
                 snsMessage: {
                     'message.$': `States.Format('${ExportType[exportType]} export for table ${this.sourceDynamoDbTable.tableName} failed because\n{}\n{}', $.${outputName}.ExportDescription.FailureCode, $.${outputName}.ExportDescription.FailureMessage)`,
                     'executionId.$': '$$.Execution.Id',
+                    sourceDynamoDbTable: this.sourceDynamoDbTable.tableName,
+                    targetBucket: this.sourceDataExportBucket.bucket,
+                    targetBucketPrefix: this.sourceDataExportBucket.prefix,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_FAILED,
                     ...timeParamFailed,

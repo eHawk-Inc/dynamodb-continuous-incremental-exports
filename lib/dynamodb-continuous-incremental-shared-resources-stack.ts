@@ -59,6 +59,21 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
       masterKey: snsKey
     });
 
+    new cdk.aws_ssm.StringParameter(this, 'ddb-export-notification-topic-arn', {
+      description: `ARN of the notification topic used by incremental export for all tables`,
+      parameterName: `/dynamodb/export/notification/topic`,
+      stringValue: this.ddbExportNotificationTopic.topicArn,
+    });
+
+    if(this.configuration.successNotificationSqsArn) {
+      new sns.Subscription(this, 'ddb-export-notification-success-subsc-sqs', {
+        topic: this.ddbExportNotificationTopic,
+        endpoint: this.configuration.successNotificationSqsArn,
+        protocol: sns.SubscriptionProtocol.SQS,
+        filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['SUCCESS'] })) }
+      });
+    }
+
     if(this.configuration.successNotificationEmail) {
       const successNotificationSub = new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
         topic: this.ddbExportNotificationTopic,
