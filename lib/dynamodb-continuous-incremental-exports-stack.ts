@@ -12,7 +12,7 @@ import {
 } from "aws-cdk-lib";
 import { Construct } from 'constructs';
 import { ConditionBuilder } from './conditionBuilder';
-import { Configuration } from './configuration';
+import { Configuration, ContextConfiguration } from './configuration';
 import { AwsServicePrincipals } from './constants/awsServicePrincipals';
 import { ScheduleConstants } from './constants/scheduleConstants';
 import { StepFunctionOutputConstants } from './constants/stepFunctionOutputConstants';
@@ -21,7 +21,15 @@ import { NodeBuilder } from './nodeBuilder';
 import { KeywordConstants } from './constants/keywordConstants';
 import { IncrementalExportDefaults } from './constants/incrementalExportDefaults';
 
-export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
+export interface DynamoDbContinuousIncrementalExportsStackProps extends cdk.NestedStackProps {
+  kmsKeyUsedForSnsTopic?: kms.Key;
+  schedulerRole?: iam.Role;
+  ddbExportNotificationTopic: sns.Topic;
+
+  configuration?: Configuration;
+}
+
+export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
 
   private configuration: Configuration;
   private sourceDataExportBucket: DataExportBucket;
@@ -31,20 +39,21 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
   private conditionBuilder: ConditionBuilder;
   private nodeBuilder: NodeBuilder;
 
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: DynamoDbContinuousIncrementalExportsStackProps) {
     super(scope, id, props);
-    this.init();
+    this.init(props);
   }
 
-  private async init() {
-    
-    this.configuration = new Configuration(this);
+  private async init(props: DynamoDbContinuousIncrementalExportsStackProps) {
+
+    this.configuration = props.configuration ?? new ContextConfiguration(this);
     await this.sanityChecks();
 
     // Let's create/get the source data export bucket as needed
     this.sourceDataExportBucket = new DataExportBucket(this, 'source-data-export-bucket', {
       account: this.account,
       region: this.region,
+      bucketOwnerAccountId: this.configuration.dataExportBucketOwnerAccountId,
       name: this.configuration.dataExportBucketName,
       sourceDdbTablename: this.configuration.sourceDynamoDbTableName,
       deploymentAlias: this.configuration.deploymentAlias,
@@ -54,37 +63,15 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
 
     this.sourceDynamoDbTable = ddb.Table.fromTableName(this, 'source-ddb-source-table', this.configuration.sourceDynamoDbTableName);
     
-    const kmsKeyUsedForSnsTopic = this.deployNotificationModule();
-    const incrementalExportTimeManipulatorFunction = this.deployIncrementalExportTimeManipulatorFunction();
+    const kmsKeyUsedForSnsTopic = this.deployNotificationModule(props);
+    const incrementalExportTimeManipulatorFunction = this.deployIncrementalExportTimeManipulatorFunction(props);
 
     this.conditionBuilder = new ConditionBuilder();
     this.nodeBuilder = new NodeBuilder(this, this.sourceDynamoDbTable, this.sourceDataExportBucket, this.ddbExportNotificationTopic, incrementalExportTimeManipulatorFunction, this.configuration);
 
     const incrementalExportStateMachine = this.deployStepFunction(kmsKeyUsedForSnsTopic);
 
-    const schedulerRole = new iam.Role(this, 'step-function-trigger-role', {
-      roleName: `${this.configuration.deploymentAlias}-incremental-export-schedule-role`,
-      description: 'Roles used to triggers the step function scheduler',
-      assumedBy: new iam.ServicePrincipal(AwsServicePrincipals.SCHEDULER, {
-        conditions: {
-          StringEquals: {
-            'aws:SourceAccount': this.account
-          }
-        }
-      }),
-      inlinePolicies: {
-        'execute_statemachine': new iam.PolicyDocument({
-          statements: [
-            new iam.PolicyStatement(
-            {
-              effect: iam.Effect.ALLOW,
-              actions: ['states:StartExecution'],
-              resources: [incrementalExportStateMachine.stateMachineArn]
-            })
-          ]
-        })
-      }
-    });
+    const schedulerRole = this.createOrUpdateSchedulerRole(incrementalExportStateMachine, props);
 
     /* 
      * If the scheduler is stopped, we need capability to automatically catch-up, 
@@ -111,36 +98,63 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
     });
   }
 
-  private deployNotificationModule() : kms.Key {
-    const snsKey = new kms.Key(this, 'ddb-export-notification-topic-key', {
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      pendingWindow: cdk.Duration.days(7),
-      description: `Key for SSE for the notification topic used by incremental export for table ${this.sourceDynamoDbTable.tableName}`,
-      enableKeyRotation: true
-    });
-    cdk.Tags.of(snsKey).add('Name', `${this.configuration.deploymentAlias}-ddb-export-notification-topic-key`);
+  private deployNotificationModule(props: DynamoDbContinuousIncrementalExportsStackProps) : kms.Key {
+    let snsKey = props.kmsKeyUsedForSnsTopic;
 
-    const topicName = `${this.configuration.deploymentAlias}-notification-topic`;
-    this.ddbExportNotificationTopic = new sns.Topic(this, 'ddb-export-notification-topic', {
-      displayName: topicName,
-      topicName: topicName,
-      enforceSSL: true,
-      masterKey: snsKey
-    });
+    if(!snsKey) {
+      snsKey = new kms.Key(this, 'ddb-export-notification-topic-key', {
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        pendingWindow: cdk.Duration.days(7),
+        description: `Key for SSE for the notification topic used by incremental export for table ${this.sourceDynamoDbTable.tableName}`,
+        enableKeyRotation: true
+      });
+      cdk.Tags.of(snsKey).add('Name', `${this.configuration.deploymentAlias}-ddb-export-notification-topic-key`);
+    }
 
-    const successNotificationSub = new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
-      topic: this.ddbExportNotificationTopic,
-      endpoint: this.configuration.successNotificationEmail,
-      protocol: sns.SubscriptionProtocol.EMAIL,
-      filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['SUCCESS'] })) }
-    });
+    this.ddbExportNotificationTopic = props.ddbExportNotificationTopic;
 
-    const failureNotificationSub = new sns.Subscription(this, 'ddb-export-notification-failure-subsc', {
-      topic: this.ddbExportNotificationTopic,
-      endpoint: this.configuration.failureNotificationEmail,
-      protocol: sns.SubscriptionProtocol.EMAIL,
-      filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['FAILED'] })) }
-    });
+    if(!this.ddbExportNotificationTopic) {
+      const topicName = `${this.configuration.deploymentAlias}-notification-topic`;
+      this.ddbExportNotificationTopic = new sns.Topic(this, 'ddb-export-notification-topic', {
+        displayName: topicName,
+        topicName: topicName,
+        enforceSSL: true,
+        masterKey: snsKey,
+      });
+
+      new cdk.aws_ssm.StringParameter(this, 'ddb-export-notification-topic-arn', {
+        description: `ARN of the notification topic used by incremental export for table ${this.sourceDynamoDbTable.tableName}`,
+        parameterName: `/dynamodb/export/notification/topic/${this.sourceDynamoDbTable.tableName}`,
+        stringValue: this.ddbExportNotificationTopic.topicArn,
+      });
+
+      if(this.configuration.successNotificationSqsArn) {
+        new sns.Subscription(this, 'ddb-export-notification-success-subsc-sqs', {
+          topic: this.ddbExportNotificationTopic,
+          endpoint: this.configuration.successNotificationSqsArn,
+          protocol: sns.SubscriptionProtocol.SQS,
+          filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['SUCCESS'] })) }
+        });
+      }
+      
+      if(this.configuration.successNotificationEmail) {
+        const successNotificationSub = new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
+          topic: this.ddbExportNotificationTopic,
+          endpoint: this.configuration.successNotificationEmail,
+          protocol: sns.SubscriptionProtocol.EMAIL,
+          filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['SUCCESS'] })) }
+        });
+      }
+
+      if(this.configuration.failureNotificationEmail) {
+        const failureNotificationSub = new sns.Subscription(this, 'ddb-export-notification-failure-subsc', {
+          topic: this.ddbExportNotificationTopic,
+          endpoint: this.configuration.failureNotificationEmail,
+          protocol: sns.SubscriptionProtocol.EMAIL,
+          filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['FAILED'] })) }
+        });
+      }
+    }
 
     return snsKey;
   }
@@ -327,7 +341,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
 
     const stateMachineLogGroup = new logs.LogGroup(this, 'incremental-export-log-group', {
       logGroupName: `${this.configuration.deploymentAlias}-incremental-export-log-group`,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.FIVE_DAYS,
       logGroupClass: logs.LogGroupClass.INFREQUENT_ACCESS
     });
@@ -344,6 +358,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
         includeExecutionData: false // Turn this on if you want to see state information being passed
       }
     });
+    cdk.Tags.of(stateMachine.role).add('Name', `${this.configuration.deploymentAlias}-ddb-state-role`);
 
     stateMachine.addToRolePolicy(new iam.PolicyStatement(
     {
@@ -368,10 +383,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
     return stateMachine;
   }
 
-  private deployIncrementalExportTimeManipulatorFunction() : lambda.Function {
-
-    const incrementalExportTimeManipulatorFunctionName = `${this.configuration.deploymentAlias}-incremental-export-time-manipulator`;
-
+  private deployIncrementalExportTimeManipulatorFunction(props: DynamoDbContinuousIncrementalExportsStackProps) : lambda.Function {
     const incrementalExportTimeManipulatorLogGroup = new logs.LogGroup(this, 'incremental-export-time-manipulator-log-group', {
       logGroupName: `${this.configuration.deploymentAlias}-incremental-export-time-manipulator-log-group`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -380,7 +392,6 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
     });
 
     const incrementalExportTimeManipulatorLambdaExecutionRole = new iam.Role(this, 'incremental-export-time-manipulator-role', {
-      roleName: `${this.configuration.deploymentAlias}-incremental-export-time-manipulator-role`,
       assumedBy: new iam.ServicePrincipal(AwsServicePrincipals.LAMBDA),
       inlinePolicies: {
         'lambdaExecPolicy': new iam.PolicyDocument({
@@ -400,28 +411,48 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.Stack {
       code: lambda.Code.fromAsset('./lib/runtime/continuousIncrementalExportsTimeManipulator'),
       handler: 'index.handler',
       runtime: lambda.Runtime.NODEJS_20_X,
-      functionName: incrementalExportTimeManipulatorFunctionName,
       architecture: lambda.Architecture.ARM_64,
       role: incrementalExportTimeManipulatorLambdaExecutionRole,
       logGroup: incrementalExportTimeManipulatorLogGroup
     });
   }
 
+  private createOrUpdateSchedulerRole(incrementalExportStateMachine: sfn.StateMachine, props: DynamoDbContinuousIncrementalExportsStackProps):  iam.Role {
+    const schedulerRole = props.schedulerRole ?? new iam.Role(this, 'step-function-trigger-role', {
+      roleName: `${this.configuration.deploymentAlias}-incremental-export-schedule-role`,
+      description: 'Roles used to triggers the step function scheduler',
+      assumedBy: new iam.ServicePrincipal(AwsServicePrincipals.SCHEDULER, {
+        conditions: {
+          StringEquals: {
+            'aws:SourceAccount': this.account
+          }
+        }
+      })
+    });
+
+    schedulerRole.attachInlinePolicy(new iam.Policy(this, `${this.configuration.deploymentAlias}-step-function-trigger-policy`, {
+      policyName: `${this.configuration.sourceDynamoDbTableName}-step-function-trigger-policy`,
+      statements: [
+        new iam.PolicyStatement(
+        {
+          effect: iam.Effect.ALLOW,
+          actions: ['states:StartExecution'],
+          resources: [incrementalExportStateMachine.stateMachineArn]
+        })
+      ]
+    }));
+
+    return schedulerRole;
+  }
+
   private async sanityChecks() {
     await this.dynamoDbSanityChecks();
-
-    if (!this.isValidDeploymentAlias())
-      throw new Error(`deploymentAlias has to be an alphanumeric string between 1 and 15 characters`);
 
     if (this.configuration.incrementalExportWindowSizeInMinutes < 15 || this.configuration.incrementalExportWindowSizeInMinutes > 24*60) {
       throw new Error(`incrementalExportWindowSizeInMinutes has to be between 15 minutes and 1,440 minutes (24h)`);
     }
   }
 
-  private isValidDeploymentAlias(): boolean {
-    const regex = /^[a-z0-9]{1,15}$/;
-    return regex.test(this.configuration.deploymentAlias);
-  }
 
   private async dynamoDbSanityChecks() {
     const ddbTableName = this.configuration.sourceDynamoDbTableName;

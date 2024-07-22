@@ -3,11 +3,29 @@ import { IncrementalExportDefaults } from './constants/incrementalExportDefaults
 import { ExportViewType } from './constants/exportViewType';
 import { ExportFormat } from './constants/exportFormat';
 
-export class Configuration {
+export interface Configuration {
   sourceDynamoDbTableName: string;
   deploymentAlias: string;
   failureNotificationEmail: string;
   successNotificationEmail: string;
+  successNotificationSqsArn?: string;
+  dataExportBucketOwnerAccountId?: string;
+  dataExportBucketName: string;
+  dataExportBucketPrefix: string;
+  incrementalExportWindowSizeInMinutes: number;
+  waitTimeToCheckExportStatusInSeconds: number;
+  exportViewType: ExportViewType;
+  exportFormat: ExportFormat;
+  awsApiInvocationTimeoutInSeconds: number;
+}
+
+export class ContextConfiguration implements Configuration{
+  sourceDynamoDbTableName: string;
+  deploymentAlias: string;
+  failureNotificationEmail: string;
+  successNotificationEmail: string;
+  successNotificationSqsArn?: string;
+  dataExportBucketOwnerAccountId?: string;
   dataExportBucketName: string;
   dataExportBucketPrefix: string;
   incrementalExportWindowSizeInMinutes: number;
@@ -21,7 +39,9 @@ export class Configuration {
     this.deploymentAlias = scope.node.tryGetContext('deploymentAlias') as string;
     this.failureNotificationEmail = scope.node.tryGetContext('failureNotificationEmail') as string;
     this.successNotificationEmail = scope.node.tryGetContext('successNotificationEmail') as string;
+    this.successNotificationEmail = scope.node.tryGetContext('successNotificationSqsArn') as string;
     this.dataExportBucketName = scope.node.tryGetContext('dataExportBucketName') as string;
+    this.dataExportBucketOwnerAccountId = scope.node.tryGetContext('dataExportBucketOwnerAccountId') as string;
     this.dataExportBucketPrefix = scope.node.tryGetContext('dataExportBucketPrefix') as string;
     this.incrementalExportWindowSizeInMinutes = parseInt(scope.node.tryGetContext('incrementalExportWindowSizeInMinutes')) || 
       IncrementalExportDefaults.DEFAULT_INCREMENTAL_EXPORT_WINDOW_SIZE_IN_MINUTES;

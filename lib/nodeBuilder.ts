@@ -258,7 +258,8 @@ export class NodeBuilder {
                 'lastExportTime.$': `$.${StepFunctionOutputConstants.EXPORT_TIME_PARAMETER_TO_USE_OUTPUT}.exportTimeParameterToUse`,
                 'incrementalExportWindowSizeInMinutes': this.incrementalExportWindowSizeInMinutes,
                 'tableArn': this.sourceDynamoDbTable.tableArn,
-                'bucket': this.sourceDataExportBucket.bucket.bucketName,
+                'bucketOwner': this.sourceDataExportBucket.bucketOwnerAccountId,
+                'bucket': this.sourceDataExportBucket.bucket,
                 'bucketPrefix': this.sourceDataExportBucket.prefix,
                 'exportFormat': IncrementalExportDefaults.DATA_EXPORT_FORMAT,
                 'exportViewType': ExportViewType[this.exportViewType]
@@ -323,9 +324,10 @@ export class NodeBuilder {
         });
 
         // Refer to: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/S3DataExport_Requesting.html
+        const exportToS3Path = `${this.sourceDataExportBucket.bucket}/${this.sourceDataExportBucket.prefix}/*`.replace(/\/\//g, '/');
         const exportToS3IamPolicyStatement = new iam.PolicyStatement({
             actions: ['s3:AbortMultipartUpload', 's3:PutObject', 's3:PutObjectAcl'],
-            resources: [this.sourceDataExportBucket.bucket.arnForObjects('*')],
+            resources: [ `arn:aws:s3:::${exportToS3Path}`],
             effect: iam.Effect.ALLOW,
             sid: 'AllowWriteToDestinationBucket'
         });
@@ -333,6 +335,7 @@ export class NodeBuilder {
 
         const executeFullExportParameters = {
             ...exportParametersBase,
+            S3BucketOwner: this.sourceDataExportBucket.bucketOwnerAccountId,
             ExportType: ExportType[ExportType.FULL_EXPORT]
         }
         this.executeFullExport = this.getDynamoDbTask(
@@ -686,6 +689,9 @@ export class NodeBuilder {
                 snsMessage: {
                     message: `${ExportType[exportType]} export for table \'${this.sourceDynamoDbTable.tableName}\' succeeded`,
                     'executionId.$': '$$.Execution.Id',
+                    sourceDynamoDbTable: this.sourceDynamoDbTable.tableName,
+                    targetBucket: this.sourceDataExportBucket.bucket,
+                    targetBucketPrefix: this.sourceDataExportBucket.prefix,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_SUCCESS,
                     ...timeParamSuccess,
@@ -702,6 +708,9 @@ export class NodeBuilder {
                 snsMessage: {
                     'message.$': `States.Format('${ExportType[exportType]} export for table ${this.sourceDynamoDbTable.tableName} failed because\n{}\n{}', $.${outputName}.ExportDescription.FailureCode, $.${outputName}.ExportDescription.FailureMessage)`,
                     'executionId.$': '$$.Execution.Id',
+                    sourceDynamoDbTable: this.sourceDynamoDbTable.tableName,
+                    targetBucket: this.sourceDataExportBucket.bucket,
+                    targetBucketPrefix: this.sourceDataExportBucket.prefix,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_FAILED,
                     ...timeParamFailed,
