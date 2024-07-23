@@ -128,7 +128,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
         stringValue: this.ddbExportNotificationTopic.topicArn,
       });
 
-      if(this.configuration.successNotificationSqsArn) {
+      if(this.configuration.successNotificationSqsArn && this.configuration.successNotificationSqsArn !== "") {
         new sns.Subscription(this, 'ddb-export-notification-success-subsc-sqs', {
           topic: this.ddbExportNotificationTopic,
           endpoint: this.configuration.successNotificationSqsArn,
