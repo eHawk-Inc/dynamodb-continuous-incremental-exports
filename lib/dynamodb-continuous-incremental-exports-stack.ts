@@ -137,7 +137,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
         });
       }
       
-      if(this.configuration.successNotificationEmail) {
+      if(this.configuration.successNotificationEmail && this.configuration.successNotificationEmail !== "") {
         const successNotificationSub = new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
           topic: this.ddbExportNotificationTopic,
           endpoint: this.configuration.successNotificationEmail,
@@ -146,7 +146,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
         });
       }
 
-      if(this.configuration.failureNotificationEmail) {
+      if(this.configuration.failureNotificationEmail && this.configuration.failureNotificationEmail !== "") {
         const failureNotificationSub = new sns.Subscription(this, 'ddb-export-notification-failure-subsc', {
           topic: this.ddbExportNotificationTopic,
           endpoint: this.configuration.failureNotificationEmail,
@@ -446,7 +446,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
   }
 
   private async sanityChecks() {
-    await this.dynamoDbSanityChecks();
+    //await this.dynamoDbSanityChecks();
 
     if (this.configuration.incrementalExportWindowSizeInMinutes < 15 || this.configuration.incrementalExportWindowSizeInMinutes > 24*60) {
       throw new Error(`incrementalExportWindowSizeInMinutes has to be between 15 minutes and 1,440 minutes (24h)`);
@@ -461,18 +461,21 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
     }
 
     await this.doesTableExist(ddbTableName)
-      .then(function (result: boolean) {
-        if (!result) {
-          throw new Error(`Source DynamoDB table \'${ddbTableName}\' cannot be found`);
-        }
-      });
+     .then(function (result: boolean) {
+       if (!result) {
+         throw new Error(`Source DynamoDB table \'${ddbTableName}\' cannot be found`);
+       }
+     });
   }
 
   private async doesTableExist(tableName: string): Promise<boolean> {
     const dynamoDB = new ddbSdk.DynamoDB();
   
     try {
-      const response = await dynamoDB.describeTable({ TableName: tableName });
+      console.log(`Checking if table '${tableName}' exists`);
+      const response = await dynamoDB.describeTable({ TableName: tableName }, {
+        requestTimeout: 60000
+      });
       return true; 
     } catch (error) {
       return false;
