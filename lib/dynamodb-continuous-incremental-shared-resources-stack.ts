@@ -75,7 +75,7 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
     }
 
     if(this.configuration.successNotificationEmail && this.configuration.successNotificationEmail !== "") {
-      const successNotificationSub = new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
+      new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
         topic: this.ddbExportNotificationTopic,
         endpoint: this.configuration.successNotificationEmail,
         protocol: sns.SubscriptionProtocol.EMAIL,
@@ -84,7 +84,7 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
     }
 
     if(this.configuration.failureNotificationEmail && this.configuration.failureNotificationEmail !== "") {
-      const failureNotificationSub = new sns.Subscription(this, 'ddb-export-notification-failure-subsc', {
+      new sns.Subscription(this, 'ddb-export-notification-failure-subsc', {
         topic: this.ddbExportNotificationTopic,
         endpoint: this.configuration.failureNotificationEmail,
         protocol: sns.SubscriptionProtocol.EMAIL,
