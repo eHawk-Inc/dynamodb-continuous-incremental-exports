@@ -358,6 +358,8 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
         includeExecutionData: false // Turn this on if you want to see state information being passed
       }
     });
+    const cfnTaskRole = stateMachine.role.node.defaultChild as iam.CfnRole;
+    cfnTaskRole.addPropertyOverride("RoleName", `${this.configuration.deploymentAlias}-ddb-state-role`);
     cdk.Tags.of(stateMachine.role).add('Name', `${this.configuration.deploymentAlias}-ddb-state-role`);
 
     stateMachine.addToRolePolicy(new iam.PolicyStatement(

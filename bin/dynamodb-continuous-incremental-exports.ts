@@ -15,6 +15,13 @@ Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 const configuration = new ContextConfiguration(app);
 const stackName = app.node.tryGetContext('stackName') as string;
 
+cdk.Tags.of(app).add("Environment", configuration.environmentName);
+cdk.Tags.of(app).add("repository_url", "https://github.com/eHawk-Inc/dynamodb-continuous-incremental-exports");
+cdk.Tags.of(app).add("cost:category", "datalake");
+cdk.Tags.of(app).add("cost:category_sub", "etl");
+cdk.Tags.of(app).add("cost:category_area", "dynamodb");
+cdk.Tags.of(app).add("cost:team", "eHawk");
+
 const incrementalExportSharedResourcesStack = new DynamoDbContinuousIncrementalSharedResourceStack(app, `${stackName}-export`, {
     configuration: configuration,
 });
@@ -38,6 +45,7 @@ configuration.sourceDynamoDbTableName
                 dataExportBucketOwnerAccountId: configuration.dataExportBucketOwnerAccountId,
             }
         });
+        cdk.Tags.of(incrementalExportStack).add("cost:category_area", tableName);
 
         NagSuppressions.addStackSuppressions(incrementalExportStack, [
             {
