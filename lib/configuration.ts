@@ -4,6 +4,7 @@ import { ExportViewType } from './constants/exportViewType';
 import { ExportFormat } from './constants/exportFormat';
 
 export interface Configuration {
+  environmentName: string;
   sourceDynamoDbTableName: string;
   deploymentAlias: string;
   failureNotificationEmail: string;
@@ -20,6 +21,7 @@ export interface Configuration {
 }
 
 export class ContextConfiguration implements Configuration{
+  environmentName: string;
   sourceDynamoDbTableName: string;
   deploymentAlias: string;
   failureNotificationEmail: string;
@@ -35,6 +37,7 @@ export class ContextConfiguration implements Configuration{
   awsApiInvocationTimeoutInSeconds: number;
 
   constructor(scope: Construct) {
+    this.environmentName = process.env.ENVIRONMENT ?? "";
     this.sourceDynamoDbTableName = scope.node.tryGetContext('sourceDynamoDbTableName') as string;
     this.deploymentAlias = scope.node.tryGetContext('deploymentAlias') as string;
     this.failureNotificationEmail = scope.node.tryGetContext('failureNotificationEmail') as string;
