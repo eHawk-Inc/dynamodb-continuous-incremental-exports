@@ -41,7 +41,7 @@ configuration.sourceDynamoDbTableName
                 ...configuration,
                 deploymentAlias: `${configuration.deploymentAlias}-${shortTableName}`,
                 sourceDynamoDbTableName: tableName,
-                dataExportBucketPrefix: `${configuration.dataExportBucketPrefix}/${tableName}`.toLowerCase(),
+                dataExportBucketPrefix: `${configuration.dataExportBucketPrefix}/${tableName.replace(/-/g, "_").toLowerCase()}`,
                 dataExportBucketOwnerAccountId: configuration.dataExportBucketOwnerAccountId,
             }
         });
