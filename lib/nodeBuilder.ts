@@ -305,7 +305,10 @@ export class NodeBuilder {
             `$.${StepFunctionOutputConstants.DESCRIBE_INCREMENTAL_EXPORT_OUTPUT}.ExportDescription.StartTime`,
             `$.${StepFunctionOutputConstants.DESCRIBE_INCREMENTAL_EXPORT_OUTPUT}.ExportDescription.EndTime`,
             { 'incrementalBlocksBehind.$': `$.${StepFunctionOutputConstants.GET_NEXT_INCREMENTAL_EXPORT_TIME_OUTPUT}.Payload.body.incrementalBlocksBehind` },
-            {'remedy.$': `$.${StepFunctionOutputConstants.GET_NEXT_INCREMENTAL_EXPORT_TIME_OUTPUT}.Payload.body.remedy` });
+            {'remedy.$': `$.${StepFunctionOutputConstants.GET_NEXT_INCREMENTAL_EXPORT_TIME_OUTPUT}.Payload.body.remedy` },
+            `$.${StepFunctionOutputConstants.DESCRIBE_INCREMENTAL_EXPORT_OUTPUT}.ExportDescription.ExportArn`, 
+
+        );
         this.incrementalExportParameterTrue = incrementExportPassNodes.success;
         this.incrementalExportParameterFalse = incrementExportPassNodes.failed;
 
@@ -402,7 +405,9 @@ export class NodeBuilder {
             `$.${StepFunctionOutputConstants.DESCRIBE_FULL_EXPORT_OUTPUT}.ExportDescription.StartTime`,
             `$.${StepFunctionOutputConstants.DESCRIBE_FULL_EXPORT_OUTPUT}.ExportDescription.EndTime`, 
             undefined,
-            {'remedy:': 'Workflow will be triggered again'});
+            {'remedy:': 'Workflow will be triggered again'},
+            `$.${StepFunctionOutputConstants.DESCRIBE_FULL_EXPORT_OUTPUT}.ExportDescription.ExportArn`, 
+        );
         this.workflowInitializedParameterTrue = exportPassNodes.success;
         this.workflowInitializedParameterFalse = exportPassNodes.failed;
 
@@ -669,7 +674,8 @@ export class NodeBuilder {
     }
 
     private getExportPassNodes(id: string, exportType: ExportType, stateName: string, resultPath: string, outputName: string, 
-        exportStartTime: string, exportEndTime: string, startTime: string, endTime: string, incrementalBlocksBehind: any, remedy: any) : { success: sfn.Pass, failed: sfn.Pass } {
+        exportStartTime: string, exportEndTime: string, startTime: string, endTime: string, incrementalBlocksBehind: any, remedy: any,
+        exportArn: string) : { success: sfn.Pass, failed: sfn.Pass } {
         
         const timeParamSuccess = {
             'exportStartTime.$': exportStartTime,
@@ -693,7 +699,8 @@ export class NodeBuilder {
                     sourceDynamoDbTable: this.sourceDynamoDbTable.tableName,
                     targetBucket: this.sourceDataExportBucket.bucket,
                     targetBucketPrefix: this.sourceDataExportBucket.prefix,
-                    'exportArn.$': `$.describeFullExportOutput.ExportDescription.ExportArn`,
+                    //'exportArn.$': `$.describeFullExportOutput.ExportDescription.ExportArn`,
+                    exportArn: exportArn,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_SUCCESS,
                     ...timeParamSuccess,
@@ -713,7 +720,7 @@ export class NodeBuilder {
                     sourceDynamoDbTable: this.sourceDynamoDbTable.tableName,
                     targetBucket: this.sourceDataExportBucket.bucket,
                     targetBucketPrefix: this.sourceDataExportBucket.prefix,
-                    exportArn: null,
+                    exportArn: exportArn,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_FAILED,
                     ...timeParamFailed,
