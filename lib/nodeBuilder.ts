@@ -437,6 +437,7 @@ export class NodeBuilder {
         const executeIncrementalExportParameters = {
             ...exportParametersBase,
             ExportFormat: IncrementalExportDefaults.DATA_EXPORT_FORMAT,
+            S3BucketOwner: this.sourceDataExportBucket.bucketOwnerAccountId,
             ExportType: ExportType[ExportType.INCREMENTAL_EXPORT],
             'IncrementalExportSpecification': {
                 'ExportFromTime.$': `$.${StepFunctionOutputConstants.GET_NEXT_INCREMENTAL_EXPORT_TIME_OUTPUT}.Payload.body.lastExportTime`,
