@@ -700,7 +700,7 @@ export class NodeBuilder {
                     targetBucket: this.sourceDataExportBucket.bucket,
                     targetBucketPrefix: this.sourceDataExportBucket.prefix,
                     //'exportArn.$': `$.describeFullExportOutput.ExportDescription.ExportArn`,
-                    exportArn: exportArn,
+                    'exportArn.$': exportArn,
                     exportType: ExportType[exportType],
                     status: KeywordConstants.SNS_SUCCESS,
                     ...timeParamSuccess,
