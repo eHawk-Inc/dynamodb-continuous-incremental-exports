@@ -22,9 +22,9 @@ import { KeywordConstants } from './constants/keywordConstants';
 import { IncrementalExportDefaults } from './constants/incrementalExportDefaults';
 
 export interface DynamoDbContinuousIncrementalExportsStackProps extends cdk.NestedStackProps {
-  kmsKeyUsedForSnsTopic?: kms.Key;
+  kmsKeyUsedForSnsTopic?: kms.IKey;
   schedulerRole?: iam.Role;
-  ddbExportNotificationTopic: sns.Topic;
+  ddbExportNotificationTopic: sns.ITopic;
 
   configuration?: Configuration;
 }
@@ -35,7 +35,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
   private sourceDataExportBucket: DataExportBucket;
   private sourceDynamoDbTable: ddb.ITable;
 
-  private ddbExportNotificationTopic: sns.Topic;
+  private ddbExportNotificationTopic: sns.ITopic;
   private conditionBuilder: ConditionBuilder;
   private nodeBuilder: NodeBuilder;
 
@@ -98,7 +98,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
     });
   }
 
-  private deployNotificationModule(props: DynamoDbContinuousIncrementalExportsStackProps) : kms.Key {
+  private deployNotificationModule(props: DynamoDbContinuousIncrementalExportsStackProps) : kms.IKey {
     let snsKey = props.kmsKeyUsedForSnsTopic;
 
     if(!snsKey) {
@@ -177,7 +177,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
     };
   }
 
-  private deployStepFunction(kmsKeyUsedForSnsTopic: kms.Key) {
+  private deployStepFunction(kmsKeyUsedForSnsTopic: kms.IKey) {
 
     // alias for better readability
     const nb = this.nodeBuilder;

@@ -23,7 +23,7 @@ export class NodeBuilder {
 
     private scope: Construct;
     private sourceDynamoDbTable: ddb.ITable;
-    private snsTopic: sns.Topic;
+    private snsTopic: sns.ITopic;
     private incrementalExportTimeManipulatorFunction: lambda.Function;
     private sourceDataExportBucket: DataExportBucket;
 
@@ -104,7 +104,7 @@ export class NodeBuilder {
     waitForIncrementalExport: sfn.Wait;
     waitForFullExport: sfn.Wait;
 
-    constructor(scope: Construct, sourceDynamoDbTable: ddb.ITable, sourceDataExportBucket: DataExportBucket, snsTopic: sns.Topic, incrementalExportTimeManipulatorFunction: lambda.Function, configuration: Configuration) {
+    constructor(scope: Construct, sourceDynamoDbTable: ddb.ITable, sourceDataExportBucket: DataExportBucket, snsTopic: sns.ITopic, incrementalExportTimeManipulatorFunction: lambda.Function, configuration: Configuration) {
 
         this.scope = scope;
         this.sourceDynamoDbTable = sourceDynamoDbTable;

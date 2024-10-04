@@ -10,13 +10,14 @@ import { Configuration, ContextConfiguration } from './configuration';
 import { AwsServicePrincipals } from './constants/awsServicePrincipals';
 interface DynamoDbContinuousIncrementalSharedResourceStackProps extends cdk.StackProps {
   configuration?: Configuration;
+  useExistingNotificationTopic: boolean;
 }
 
 export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack {
 
   private configuration: Configuration;
-  public ddbExportNotificationTopic: sns.Topic;
-  public kmsKeyUsedForSnsTopic: kms.Key;
+  public ddbExportNotificationTopic: sns.ITopic;
+  public kmsKeyUsedForSnsTopic: kms.IKey;
   public schedulerRole: iam.Role;
 
   constructor(scope: Construct, id: string, props: DynamoDbContinuousIncrementalSharedResourceStackProps) {
@@ -28,7 +29,15 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
   private async init(props: DynamoDbContinuousIncrementalSharedResourceStackProps) {
     this.configuration = props.configuration ?? new ContextConfiguration(this);
 
-    this.kmsKeyUsedForSnsTopic = this.deployNotificationModule();
+    if (props.useExistingNotificationTopic) {
+      const notificationTopicArn = cdk.aws_ssm.StringParameter.valueForStringParameter(this, '/dynamodb/export/notification/topic');
+      this.ddbExportNotificationTopic = sns.Topic.fromTopicArn(this, 'ddb-export-notification-topic', notificationTopicArn);
+
+      const kmsArn = cdk.aws_ssm.StringParameter.valueForStringParameter(this, `/dynamodb/export/notification/kms`);
+      this.kmsKeyUsedForSnsTopic = kms.Key.fromKeyArn(this, 'ddb-export-notification-topic-key', kmsArn);
+    } else {
+      this.kmsKeyUsedForSnsTopic = this.deployNotificationModule();
+    }
 
     this.schedulerRole = new iam.Role(this, 'step-function-trigger-role', {
       description: 'Roles used to triggers the step function scheduler',
@@ -50,6 +59,12 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
       enableKeyRotation: true
     });
     cdk.Tags.of(snsKey).add('Name', `${this.configuration.deploymentAlias}-ddb-export-notification-topic-key`);
+
+    new cdk.aws_ssm.StringParameter(this, 'ddb-export-notification-kms-arn', {
+      description: `ARN of the notification topic used by incremental export for all tables`,
+      parameterName: `/dynamodb/export/notification/kms`,
+      stringValue: snsKey.keyArn,
+    });
 
     const topicName = `${this.configuration.deploymentAlias}-notification-topic`;
     this.ddbExportNotificationTopic = new sns.Topic(this, 'ddb-export-notification-topic', {

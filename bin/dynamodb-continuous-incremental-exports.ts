@@ -24,6 +24,7 @@ cdk.Tags.of(app).add("cost:team", "eHawk");
 
 const incrementalExportSharedResourcesStack = new DynamoDbContinuousIncrementalSharedResourceStack(app, `${stackName}-export`, {
     configuration: configuration,
+    useExistingNotificationTopic: process.env.USE_EXISTING_NOTIFICATION_TOPIC === 'true'
 });
 
 configuration.sourceDynamoDbTableName
