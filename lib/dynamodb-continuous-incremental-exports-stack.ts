@@ -93,7 +93,6 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
         },
       },
       description: `Triggers the step function every ${schedulerTime} minutes`,
-      name: `${this.configuration.deploymentAlias}-incremental-export-schedule`,
       state: KeywordConstants.ENABLED
     });
   }
