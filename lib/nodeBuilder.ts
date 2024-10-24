@@ -276,6 +276,7 @@ export class NodeBuilder {
             iamResources: [lastIncrementalExportTimeParameterIamArn],
             parameters: {
                 Name: `/${this.lastIncrementalExportTimeParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value.$': `$.${StepFunctionOutputConstants.INCREMENTAL_EXPORT_OUTPUT}.ExportDescription.IncrementalExportSpecification.ExportToTime`,
                 'Overwrite': true,
                 'Type': 'String'
@@ -360,6 +361,7 @@ export class NodeBuilder {
             iamResources: [fullExportTimeParameterIamArn],
             parameters: {
                 Name: `/${this.fullExportTimeParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value.$': `$.${StepFunctionOutputConstants.FULL_EXPORT_OUTPUT}.ExportDescription.ExportTime`,
                 'Overwrite': true,
                 'Type': 'String'
@@ -474,6 +476,7 @@ export class NodeBuilder {
             iamResources: [workflowInitiatedParameterArn],
             parameters: {
                 Name: `/${this.workflowInitiatedParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value.$': `$.${StepFunctionOutputConstants.WORKFLOW_INITIALIZED_PARAMETER_OUTPUT}.success`,
                 'Overwrite': true,
                 'Type': 'String'
@@ -491,6 +494,7 @@ export class NodeBuilder {
             iamResources: [workflowStateParameterArn],
             parameters: {
                 Name: `/${this.workflowStateParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value': WorkflowState[WorkflowState.PITR_GAP],
                 'Overwrite': true,
                 'Type': 'String'
@@ -507,6 +511,7 @@ export class NodeBuilder {
             iamResources: [workflowStateParameterArn],
             parameters: {
                 Name: `/${this.workflowStateParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value': WorkflowState[WorkflowState.NORMAL],
                 'Overwrite': true,
                 'Type': 'String'
@@ -524,6 +529,7 @@ export class NodeBuilder {
             iamResources: [workflowActionParameterArn],
             parameters: {
                 Name: `/${this.workflowActionParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value': WorkflowAction[WorkflowAction.RUN],
                 'Overwrite': true,
                 'Type': 'String'
@@ -541,6 +547,7 @@ export class NodeBuilder {
             iamResources: [workflowInitiatedParameterArn],
             parameters: {
                 Name: `/${this.workflowInitiatedParameterName}`,
+                Description: `${this.sourceDynamoDbTable.tableName}`,
                 'Value': KeywordConstants.NULL_STRING, // we set an empty value to indicate that the worklow has begun but not completed (with success or failure)
                 'Overwrite': true,
                 'Type': 'String'
