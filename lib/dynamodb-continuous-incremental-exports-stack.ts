@@ -41,6 +41,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
 
   constructor(scope: Construct, id: string, props: DynamoDbContinuousIncrementalExportsStackProps) {
     super(scope, id, props);
+    this.templateOptions.description = 'Guidance for Incremental Data Exports from Amazon DynamoDB (SO9520)';
     this.init(props);
   }
 
