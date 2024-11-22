@@ -340,7 +340,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
           );
 
     const stateMachineLogGroup = new logs.LogGroup(this, 'incremental-export-log-group', {
-      logGroupName: `${this.configuration.deploymentAlias}-incremental-export-log-group`,
+      logGroupName: `/aws/vendedlogs/${this.configuration.deploymentAlias}-incremental-export-log-group`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.FIVE_DAYS,
       logGroupClass: logs.LogGroupClass.INFREQUENT_ACCESS
@@ -387,7 +387,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
 
   private deployIncrementalExportTimeManipulatorFunction(props: DynamoDbContinuousIncrementalExportsStackProps) : lambda.Function {
     const incrementalExportTimeManipulatorLogGroup = new logs.LogGroup(this, 'incremental-export-time-manipulator-log-group', {
-      logGroupName: `${this.configuration.deploymentAlias}-incremental-export-time-manipulator-log-group`,
+      logGroupName: `/aws/vendedlogs/${this.configuration.deploymentAlias}-incremental-export-time-manipulator-log-group`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       retention: logs.RetentionDays.FIVE_DAYS,
       logGroupClass: logs.LogGroupClass.INFREQUENT_ACCESS
