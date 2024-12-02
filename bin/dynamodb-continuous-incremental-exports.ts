@@ -31,20 +31,23 @@ configuration.sourceDynamoDbTableName
     .split(',')
     .filter(tableName => tableName.trim().length > 0)
     .forEach(tableName => {
-        const tableNameParts = tableName.split("-");
-        const shortTableName = (tableName.length > 10 ? tableNameParts[tableNameParts.length - 1] : tableName).toLowerCase();
+        const tableNameParts = tableName.split(/[-_]/g);
+        const shortTableName = (tableName.length > 10 ? tableNameParts[tableNameParts.length - 1] : tableName).replace(/[-_]/g, "").toLowerCase();
         
-        const incrementalExportStack = new DynamoDbContinuousIncrementalExportsStack(incrementalExportSharedResourcesStack, tableName, {
-            kmsKeyUsedForSnsTopic: incrementalExportSharedResourcesStack.kmsKeyUsedForSnsTopic,
-            ddbExportNotificationTopic: incrementalExportSharedResourcesStack.ddbExportNotificationTopic,
-            schedulerRole: incrementalExportSharedResourcesStack.schedulerRole,
-            configuration: {
-                ...configuration,
-                deploymentAlias: `${configuration.deploymentAlias}-${shortTableName}`,
-                sourceDynamoDbTableName: tableName,
-                dataExportBucketPrefix: `${configuration.dataExportBucketPrefix}/${tableName.replace(/-/g, "_").toLowerCase()}`,
-                dataExportBucketOwnerAccountId: configuration.dataExportBucketOwnerAccountId,
-            }
+        const incrementalExportStack = new DynamoDbContinuousIncrementalExportsStack(
+            incrementalExportSharedResourcesStack,
+            tableName.replace(/_/g, "-"),
+            {
+                kmsKeyUsedForSnsTopic: incrementalExportSharedResourcesStack.kmsKeyUsedForSnsTopic,
+                ddbExportNotificationTopic: incrementalExportSharedResourcesStack.ddbExportNotificationTopic,
+                schedulerRole: incrementalExportSharedResourcesStack.schedulerRole,
+                configuration: {
+                    ...configuration,
+                    deploymentAlias: `${configuration.deploymentAlias}-${shortTableName}`,
+                    sourceDynamoDbTableName: tableName,
+                    dataExportBucketPrefix: `${configuration.dataExportBucketPrefix}/${tableName.replace(/-/g, "_").toLowerCase()}`,
+                    dataExportBucketOwnerAccountId: configuration.dataExportBucketOwnerAccountId,
+                }
         });
         cdk.Tags.of(incrementalExportStack).add("cost:category_area", tableName);
 
