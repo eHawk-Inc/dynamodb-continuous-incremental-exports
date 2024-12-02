@@ -432,17 +432,19 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
       })
     });
 
-    schedulerRole.attachInlinePolicy(new iam.Policy(this, `${this.configuration.deploymentAlias}-step-function-trigger-policy`, {
-      policyName: `${this.configuration.sourceDynamoDbTableName}-step-function-trigger-policy`,
-      statements: [
-        new iam.PolicyStatement(
-        {
-          effect: iam.Effect.ALLOW,
-          actions: ['states:StartExecution'],
-          resources: [incrementalExportStateMachine.stateMachineArn]
-        })
-      ]
-    }));
+    if (!props.schedulerRole) {
+      schedulerRole.attachInlinePolicy(new iam.Policy(this, `${this.configuration.deploymentAlias}-step-function-trigger-policy`, {
+        policyName: `${this.configuration.sourceDynamoDbTableName}-step-function-trigger-policy`,
+        statements: [
+          new iam.PolicyStatement(
+          {
+            effect: iam.Effect.ALLOW,
+            actions: ['states:StartExecution'],
+            resources: [incrementalExportStateMachine.stateMachineArn]
+          })
+        ]
+      }));
+    }
 
     return schedulerRole;
   }

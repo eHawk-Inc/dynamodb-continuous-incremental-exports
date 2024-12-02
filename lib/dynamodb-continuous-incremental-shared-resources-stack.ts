@@ -8,6 +8,8 @@ import {
 import { Construct } from 'constructs';
 import { Configuration, ContextConfiguration } from './configuration';
 import { AwsServicePrincipals } from './constants/awsServicePrincipals';
+import { NagSuppressions } from 'cdk-nag';
+
 interface DynamoDbContinuousIncrementalSharedResourceStackProps extends cdk.StackProps {
   configuration?: Configuration;
   useExistingNotificationTopic: boolean;
@@ -49,6 +51,30 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
         }
       }),
     });
+
+    this.schedulerRole.attachInlinePolicy(new iam.Policy(this, `step-function-trigger-policy`, {
+      policyName: `step-function-trigger-policy`,
+      statements: [
+        new iam.PolicyStatement(
+        {
+          effect: iam.Effect.ALLOW,
+          actions: ['states:StartExecution'],
+          resources: ["*"],
+          conditions: {
+            "StringLike": {
+              "states:ExecutionArn": `arn:aws:states:${this.region}:${this.account}:stateMachine:${this.configuration.deploymentAlias}-*`
+            }
+          }
+        })
+      ]
+    }));
+
+    NagSuppressions.addStackSuppressions(this, [
+      {
+          id: 'AwsSolutions-IAM5',
+          reason: 'Condition is added to allow states:StartExecution on all resources to trigger state machines dynamically.',
+      }
+    ]);
   }
 
   private deployNotificationModule() : kms.Key {
