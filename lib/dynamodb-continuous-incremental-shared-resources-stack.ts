@@ -61,8 +61,8 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
           actions: ['states:StartExecution'],
           resources: ["*"],
           conditions: {
-            "StringLike": {
-              "states:ExecutionArn": `arn:aws:states:${this.region}:${this.account}:stateMachine:${this.configuration.deploymentAlias}-*`
+            "ArnLike": {
+              "aws:SourceArn": `arn:aws:states:${this.region}:${this.account}:stateMachine:${this.configuration.deploymentAlias}-*`
             }
           }
         })
