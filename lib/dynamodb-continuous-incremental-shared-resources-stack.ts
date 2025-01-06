@@ -60,11 +60,6 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
           effect: iam.Effect.ALLOW,
           actions: ['states:StartExecution'],
           resources: ["*"],
-          conditions: {
-            "ArnLike": {
-              "aws:SourceArn": `arn:aws:states:${this.region}:${this.account}:stateMachine:${this.configuration.deploymentAlias}-*`
-            }
-          }
         })
       ]
     }));

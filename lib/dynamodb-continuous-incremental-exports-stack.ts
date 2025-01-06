@@ -81,7 +81,8 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
     const schedulerTime = Math.floor(this.configuration.incrementalExportWindowSizeInMinutes/3);
     const cfnSchedule = new scheduler.CfnSchedule(this, 'step-function-trigger-schedule', {
       flexibleTimeWindow: {
-        mode: ScheduleConstants.SCHEDULE_MODE_OFF
+        mode: ScheduleConstants.SCHEDULE_MODE_FLEXIBLE,
+        maximumWindowInMinutes: 15,
       },
       scheduleExpression: `rate(${schedulerTime} minutes)`,
       target: {
@@ -89,8 +90,8 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
         roleArn: schedulerRole.roleArn,
     
         retryPolicy: {
-          maximumEventAgeInSeconds: cdk.Duration.days(1).toSeconds(),
-          maximumRetryAttempts: 5,
+          maximumEventAgeInSeconds: cdk.Duration.minutes(schedulerTime/2).toSeconds(),
+          maximumRetryAttempts: 1,
         },
       },
       description: `Triggers the step function every ${schedulerTime} minutes`,
@@ -352,6 +353,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
       stateMachineName: stateMachineName,
       comment: 'DynamoDB export state machine',
       tracingEnabled: true,
+      
       logs: {
         destination: stateMachineLogGroup,
         level: sfn.LogLevel.ALL,
