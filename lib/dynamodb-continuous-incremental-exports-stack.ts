@@ -414,7 +414,7 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
     return new lambda.Function(this, 'incremental-export-time-manipulator', {
       code: lambda.Code.fromAsset('./lib/runtime/continuousIncrementalExportsTimeManipulator'),
       handler: 'index.handler',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       architecture: lambda.Architecture.ARM_64,
       role: incrementalExportTimeManipulatorLambdaExecutionRole,
       logGroup: incrementalExportTimeManipulatorLogGroup
