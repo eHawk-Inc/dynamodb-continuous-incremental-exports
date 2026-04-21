@@ -454,8 +454,8 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
   private async sanityChecks() {
     //await this.dynamoDbSanityChecks();
 
-    if (this.configuration.incrementalExportWindowSizeInMinutes < 15 || this.configuration.incrementalExportWindowSizeInMinutes > 24*60) {
-      throw new Error(`incrementalExportWindowSizeInMinutes has to be between 15 minutes and 1,440 minutes (24h)`);
+    if (this.configuration.incrementalExportWindowSizeInMinutes < 15 || this.configuration.incrementalExportWindowSizeInMinutes > 3*24*60) {
+      throw new Error(`incrementalExportWindowSizeInMinutes has to be between 15 minutes and 4,320 minutes (72h)`);
     }
   }
 
