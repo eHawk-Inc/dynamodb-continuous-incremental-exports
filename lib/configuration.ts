@@ -10,6 +10,7 @@ export interface Configuration {
   failureNotificationEmail: string;
   successNotificationEmail: string;
   successNotificationSqsArn?: string;
+  failureNotificationSqsArn?: string;
   dataExportBucketOwnerAccountId?: string;
   dataExportBucketName: string;
   dataExportBucketPrefix: string;
@@ -27,6 +28,7 @@ export class ContextConfiguration implements Configuration{
   failureNotificationEmail: string;
   successNotificationEmail: string;
   successNotificationSqsArn?: string;
+  failureNotificationSqsArn?: string;
   dataExportBucketOwnerAccountId?: string;
   dataExportBucketName: string;
   dataExportBucketPrefix: string;
@@ -43,6 +45,7 @@ export class ContextConfiguration implements Configuration{
     this.failureNotificationEmail = scope.node.tryGetContext('failureNotificationEmail') as string;
     this.successNotificationEmail = scope.node.tryGetContext('successNotificationEmail') as string;
     this.successNotificationSqsArn = scope.node.tryGetContext('successNotificationSqsArn') as string;
+    this.failureNotificationSqsArn = scope.node.tryGetContext('failureNotificationSqsArn') as string;
     this.dataExportBucketName = scope.node.tryGetContext('dataExportBucketName') as string;
     this.dataExportBucketOwnerAccountId = scope.node.tryGetContext('dataExportBucketOwnerAccountId') as string;
     this.dataExportBucketPrefix = scope.node.tryGetContext('dataExportBucketPrefix') as string;

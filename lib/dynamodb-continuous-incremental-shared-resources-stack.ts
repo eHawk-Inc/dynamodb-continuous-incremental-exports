@@ -110,6 +110,15 @@ export class DynamoDbContinuousIncrementalSharedResourceStack extends cdk.Stack 
       });
     }
 
+    if(this.configuration.failureNotificationSqsArn && this.configuration.failureNotificationSqsArn !== "") {
+      new sns.Subscription(this, 'ddb-export-notification-failure-subsc-sqs', {
+        topic: this.ddbExportNotificationTopic,
+        endpoint: this.configuration.failureNotificationSqsArn,
+        protocol: sns.SubscriptionProtocol.SQS,
+        filterPolicyWithMessageBody: { status: sns.FilterOrPolicy.filter(sns.SubscriptionFilter.stringFilter({ allowlist: ['FAILED'] })) }
+      });
+    }
+
     if(this.configuration.successNotificationEmail && this.configuration.successNotificationEmail !== "") {
       new sns.Subscription(this, 'ddb-export-notification-success-subsc', {
         topic: this.ddbExportNotificationTopic,
