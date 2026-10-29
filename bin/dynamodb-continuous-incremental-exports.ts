@@ -6,7 +6,7 @@ import { Aspects } from 'aws-cdk-lib';
 import { DynamoDbContinuousIncrementalExportsStack } from '../lib/dynamodb-continuous-incremental-exports-stack';
 import { DynamoDbContinuousIncrementalSharedResourceStack } from '../lib/dynamodb-continuous-incremental-shared-resources-stack';
 import { NagSuppressions } from 'cdk-nag';
-import { ContextConfiguration } from '../lib/configuration';
+import { ContextConfiguration, isTableDisabled } from '../lib/configuration';
 
 const app = new cdk.App();
 
@@ -27,10 +27,18 @@ const incrementalExportSharedResourcesStack = new DynamoDbContinuousIncrementalS
     useExistingNotificationTopic: process.env.USE_EXISTING_NOTIFICATION_TOPIC === 'true'
 });
 
-configuration.sourceDynamoDbTableName
+const sourceTableNames = configuration.sourceDynamoDbTableName
     .split(',')
-    .filter(tableName => tableName.trim().length > 0)
-    .forEach(tableName => {
+    .filter(tableName => tableName.trim().length > 0);
+
+// An entry that matches no deployed table is a warning, not an error: the table may lack the export tag or PITR.
+configuration.disabledTables.forEach(entry => {
+    if (!sourceTableNames.some(tableName => isTableDisabled(tableName, [entry]))) {
+        cdk.Annotations.of(app).addWarning(`disabledTables entry '${entry}' matches no table being exported`);
+    }
+});
+
+sourceTableNames.forEach(tableName => {
         const tableNameParts = tableName.split(/[-_]/g);
         const shortTableName = (tableName.length > 10 ? tableNameParts[tableNameParts.length - 1] : tableName).replace(/[-_]/g, "").toLowerCase();
         
@@ -47,6 +55,7 @@ configuration.sourceDynamoDbTableName
                     sourceDynamoDbTableName: tableName,
                     dataExportBucketPrefix: `${configuration.dataExportBucketPrefix}/${tableName.replace(/-/g, "_").toLowerCase()}`,
                     dataExportBucketOwnerAccountId: configuration.dataExportBucketOwnerAccountId,
+                    scheduleDisabled: isTableDisabled(tableName, configuration.disabledTables),
                 }
         });
         cdk.Tags.of(incrementalExportStack).add("cost:category_area", tableName);

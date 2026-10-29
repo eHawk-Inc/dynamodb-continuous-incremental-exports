@@ -204,6 +204,15 @@ The solution maintains SSM Parameters to ensure incremental exports work as expe
     1. `RESET_WITH_FULL_EXPORT_AGAIN` state
     Set when an explicit reiniatilization is required. E.g. when [PITR is turned off/on](#i-get-the-error-incremental-export-start-time-outside-pitr-window)
 
+### Per-table schedule state (`disabledTables`)
+* Context `-c disabledTables=<comma list>` deploys the listed tables' EventBridge schedule as `DISABLED`; every other table is `ENABLED`.
+* Unset or empty means all schedules are `ENABLED`.
+* Entries match the full table name or its last name segment, case-insensitive (`RouteEntry` matches `ehawk-mobilehub-<id>-RouteEntry`).
+* An entry that matches no exported table produces a CDK warning, not an error.
+* In `ehawk-backend` the list comes from the GitHub variable `DDB_EXPORT_DISABLED_TABLES`, set per environment (production deploys both production-us and production-ca).
+* This is not a pause mechanism: `workflow-action=PAUSE` is. `PAUSE` keeps the schedule running and the workflow idle, so it catches up cleanly.
+* Re-enabling after more than 35 days disabled: set `workflow-action` to `RESET_WITH_FULL_EXPORT_AGAIN`, because the incremental start time falls outside the PITR window.
+
 ### Security
 1. As the Step Functions are deployed using the CDK, the permissions assigned to the role assumed by the Step Function are scoped using the principle of least privilege. Also refer to the [Ensure long term success](#ensure-long-term-success) section.
 2. Encryption at rest has been enabled where appropriate along with any required rules to enforce communication via encrypted channels (i.e. TLS).
@@ -214,7 +223,7 @@ The solution maintains SSM Parameters to ensure incremental exports work as expe
     * Roles and permissions
     * The SSM Parameters created by the Step Function, except for `workflow-action` state which allows you to **PAUSE/RESET** the workflow
     * The Lambda Function used by the Step Function
-* **DO NOT** pause or stop the Eventbridge Schedule that triggers the Step Function; use the `workflow-action` parameter instead
+* **DO NOT** pause or stop the Eventbridge Schedule that triggers the Step Function in the console; use the `workflow-action` parameter instead. A schedule is only disabled through the `disabledTables` context below, so CDK owns the state
 
 ### FAQ, known issues, additional considerations, and limitations
 #### How do I enable PITR for this workflow to work?
