@@ -19,6 +19,10 @@ export interface Configuration {
   exportViewType: ExportViewType;
   exportFormat: ExportFormat;
   awsApiInvocationTimeoutInSeconds: number;
+  /** Comma-separated context `disabledTables` entries; empty when unset. */
+  disabledTables?: string[];
+  /** Set per table by bin/ from `disabledTables`; the schedule is deployed DISABLED. */
+  scheduleDisabled?: boolean;
 }
 
 export class ContextConfiguration implements Configuration{
@@ -37,6 +41,8 @@ export class ContextConfiguration implements Configuration{
   exportViewType: ExportViewType;
   exportFormat: ExportFormat;
   awsApiInvocationTimeoutInSeconds: number;
+  disabledTables: string[];
+  scheduleDisabled?: boolean;
 
   constructor(scope: Construct) {
     this.environmentName = process.env.ENVIRONMENT ?? "";
@@ -60,5 +66,27 @@ export class ContextConfiguration implements Configuration{
 
     this.awsApiInvocationTimeoutInSeconds = parseInt(scope.node.tryGetContext('awsApiInvocationTimeoutInSeconds')) || 
       IncrementalExportDefaults.AWS_API_INVOCATION_TIMEOUT_IN_SECONDS;
+
+    this.disabledTables = parseDisabledTables(scope.node.tryGetContext('disabledTables'));
   }
+}
+
+/** Parses the `disabledTables` context value (comma list, blanks ignored). */
+export function parseDisabledTables(value: unknown): string[] {
+  return String(value ?? '')
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(entry => entry.length > 0);
+}
+
+/** Last name segment, lowercased: `ehawk-mobilehub-123-RouteEntry` and `RouteEntry` both give `routeentry`. */
+export function normalizeTableName(tableName: string): string {
+  const parts = tableName.split(/[-_]/g);
+  return parts[parts.length - 1].toLowerCase();
+}
+
+/** True when the table matches a disabledTables entry by full name or by normalized last segment. */
+export function isTableDisabled(tableName: string, disabledTables: string[] = []): boolean {
+  return disabledTables.some(entry =>
+    entry === tableName || normalizeTableName(entry) === normalizeTableName(tableName));
 }
