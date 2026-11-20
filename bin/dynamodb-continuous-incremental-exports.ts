@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { AwsSolutionsChecks } from 'cdk-nag'
 import { Aspects } from 'aws-cdk-lib';
@@ -7,6 +8,7 @@ import { DynamoDbContinuousIncrementalExportsStack } from '../lib/dynamodb-conti
 import { DynamoDbContinuousIncrementalSharedResourceStack } from '../lib/dynamodb-continuous-incremental-shared-resources-stack';
 import { NagSuppressions } from 'cdk-nag';
 import { ContextConfiguration, isTableDisabled } from '../lib/configuration';
+import { addSyncGroupWarnings, loadSyncGroupsConfig, resolveSyncGroups, syncGroupEnvironmentKey } from '../lib/syncGroups';
 
 const app = new cdk.App();
 
@@ -38,10 +40,22 @@ configuration.disabledTables.forEach(entry => {
     }
 });
 
+// Sync groups end every member's windows at the group time; a bad group fails the synth before any nested stack.
+const syncGroups = resolveSyncGroups({
+    config: loadSyncGroupsConfig(path.join(__dirname, '..', 'config', 'sync-groups.json')),
+    environmentKey: syncGroupEnvironmentKey(process.env),
+    tableNames: sourceTableNames,
+    incrementalExportWindowSizeInMinutes: configuration.incrementalExportWindowSizeInMinutes,
+    disabledTables: configuration.disabledTables,
+});
+// On the shared stack, not the App: CDK leaves App-level annotations out of the cloud assembly.
+addSyncGroupWarnings(incrementalExportSharedResourcesStack, syncGroups.warnings);
+
 sourceTableNames.forEach(tableName => {
         const tableNameParts = tableName.split(/[-_]/g);
         const shortTableName = (tableName.length > 10 ? tableNameParts[tableNameParts.length - 1] : tableName).replace(/[-_]/g, "").toLowerCase();
-        
+        const syncGroupTimeUtc = syncGroups.groupTimeByTable.get(tableName);
+
         const incrementalExportStack = new DynamoDbContinuousIncrementalExportsStack(
             incrementalExportSharedResourcesStack,
             tableName.replace(/_/g, "-"),
@@ -56,6 +70,7 @@ sourceTableNames.forEach(tableName => {
                     dataExportBucketPrefix: `${configuration.dataExportBucketPrefix}/${tableName.replace(/-/g, "_").toLowerCase()}`,
                     dataExportBucketOwnerAccountId: configuration.dataExportBucketOwnerAccountId,
                     scheduleDisabled: isTableDisabled(tableName, configuration.disabledTables),
+                    syncGroupTimeUtc,
                 }
         });
         cdk.Tags.of(incrementalExportStack).add("cost:category_area", tableName);

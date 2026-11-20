@@ -1,0 +1,16 @@
+{
+  "prd-us": [
+    {
+      "name": "population-trends",
+      "timeUtc": "21:00",
+      "members": ["CaseEpisode", "Appointments", "CasePrescription"]
+    }
+  ],
+  "stg-us": [
+    {
+      "name": "population-trends",
+      "timeUtc": "21:00",
+      "members": ["CaseEpisode", "Appointments", "CasePrescription"]
+    }
+  ]
+}

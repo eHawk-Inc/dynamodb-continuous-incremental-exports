@@ -23,6 +23,8 @@ export interface Configuration {
   disabledTables?: string[];
   /** Set per table by bin/ from `disabledTables`; the schedule is deployed DISABLED. */
   scheduleDisabled?: boolean;
+  /** Set per table by bin/ from `config/sync-groups.json`: the group's daily window end, `HH:MM` UTC. Absent outside a group. */
+  syncGroupTimeUtc?: string;
 }
 
 export class ContextConfiguration implements Configuration{
@@ -43,6 +45,7 @@ export class ContextConfiguration implements Configuration{
   awsApiInvocationTimeoutInSeconds: number;
   disabledTables: string[];
   scheduleDisabled?: boolean;
+  syncGroupTimeUtc?: string;
 
   constructor(scope: Construct) {
     this.environmentName = process.env.ENVIRONMENT ?? "";
@@ -85,8 +88,12 @@ export function normalizeTableName(tableName: string): string {
   return parts[parts.length - 1].toLowerCase();
 }
 
+/** True when a table-list entry names the table by full name or by normalized last segment. */
+export function tableMatchesEntry(tableName: string, entry: string): boolean {
+  return entry === tableName || normalizeTableName(entry) === normalizeTableName(tableName);
+}
+
 /** True when the table matches a disabledTables entry by full name or by normalized last segment. */
 export function isTableDisabled(tableName: string, disabledTables: string[] = []): boolean {
-  return disabledTables.some(entry =>
-    entry === tableName || normalizeTableName(entry) === normalizeTableName(tableName));
+  return disabledTables.some(entry => tableMatchesEntry(tableName, entry));
 }

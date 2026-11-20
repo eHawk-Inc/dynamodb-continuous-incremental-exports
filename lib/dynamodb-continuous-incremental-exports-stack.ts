@@ -20,6 +20,7 @@ import { DataExportBucket } from './constructs/dataExportBucket';
 import { NodeBuilder } from './nodeBuilder';
 import { KeywordConstants } from './constants/keywordConstants';
 import { IncrementalExportDefaults } from './constants/incrementalExportDefaults';
+import { syncGroupScheduleDescription, syncGroupScheduleExpression } from './syncGroups';
 
 export interface DynamoDbContinuousIncrementalExportsStackProps extends cdk.NestedStackProps {
   kmsKeyUsedForSnsTopic?: kms.IKey;
@@ -79,12 +80,32 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
      * therefore the scheduler needs to run more often. So we divide the time period by 3
      */
     const schedulerTime = Math.floor(this.configuration.incrementalExportWindowSizeInMinutes/3);
+
+    /*
+     * A sync group member runs at fixed UTC times just after its group time, with the same three runs a day,
+     * so its window is exported as soon as it closes. Every other table keeps the rate and its flexible window.
+     */
+    const syncGroupTimeUtc = this.configuration.syncGroupTimeUtc;
+    const scheduleTiming = syncGroupTimeUtc === undefined
+      ? {
+          flexibleTimeWindow: {
+            mode: ScheduleConstants.SCHEDULE_MODE_FLEXIBLE,
+            maximumWindowInMinutes: 15,
+          },
+          scheduleExpression: `rate(${schedulerTime} minutes)`,
+          description: `Triggers the step function every ${schedulerTime} minutes`,
+        }
+      : {
+          flexibleTimeWindow: {
+            mode: ScheduleConstants.SCHEDULE_MODE_OFF,
+          },
+          scheduleExpression: syncGroupScheduleExpression(syncGroupTimeUtc, this.configuration.incrementalExportWindowSizeInMinutes),
+          scheduleExpressionTimezone: 'UTC',
+          description: syncGroupScheduleDescription(syncGroupTimeUtc, this.configuration.incrementalExportWindowSizeInMinutes),
+        };
+
     const cfnSchedule = new scheduler.CfnSchedule(this, 'step-function-trigger-schedule', {
-      flexibleTimeWindow: {
-        mode: ScheduleConstants.SCHEDULE_MODE_FLEXIBLE,
-        maximumWindowInMinutes: 15,
-      },
-      scheduleExpression: `rate(${schedulerTime} minutes)`,
+      ...scheduleTiming,
       target: {
         arn: incrementalExportStateMachine.stateMachineArn,
         roleArn: schedulerRole.roleArn,
@@ -94,7 +115,6 @@ export class DynamoDbContinuousIncrementalExportsStack extends cdk.NestedStack {
           maximumRetryAttempts: 1,
         },
       },
-      description: `Triggers the step function every ${schedulerTime} minutes`,
       state: this.configuration.scheduleDisabled ? KeywordConstants.DISABLED : KeywordConstants.ENABLED
     });
   }

@@ -213,6 +213,30 @@ The solution maintains SSM Parameters to ensure incremental exports work as expe
 * This is not a pause mechanism: `workflow-action=PAUSE` is. `PAUSE` keeps the schedule running and the workflow idle, so it catches up cleanly.
 * Re-enabling after more than 35 days disabled: set `workflow-action` to `RESET_WITH_FULL_EXPORT_AGAIN`, because the incremental start time falls outside the PITR window.
 
+### Sync groups
+A sync group names member tables and one daily **group time** in UTC. Every member's export window ends at the group time, and the members export a few minutes after it, so their exports and the data lake commits that follow them land within minutes of each other. Members never wait for each other: a member that fails, is paused or is running a full export behaves like any other table, and the other members export as usual.
+
+* Groups live in `config/sync-groups.json`, keyed by `<ENVIRONMENT_SHORT>-<EHAWK_REGION>` from the deploy's environment variables (`stg-us`, `prd-us`, ...). An environment with no key, or a deploy without either variable, has no group, and every table keeps its usual schedule.
+* Today `prd-us` and `stg-us` each have one group, `population-trends`, at `21:00` UTC, with members `CaseEpisode`, `Appointments` and `CasePrescription`.
+* Members match tables like `disabledTables` entries: by full table name or by last name segment, ignoring case.
+* The synth fails when a table is named in two groups, when a member entry matches more than one exported table, or when a member is exported with an `incrementalExportWindowSizeInMinutes` other than `1440`. A group time is a time of day, so groups need 24-hour windows; the CA environments use 4320 and would need a window change first. The synth warns, on the `<stackName>-export` stack, when only some members of a group are exported and when a member is also in `disabledTables`.
+* The file ships with each environment's next deploy after it is merged to the default branch. In `ehawk-backend`, stage US redeploys on the weekly Sunday run of `deploy-ddb-export` or a manual dispatch, and production only on a manual dispatch. The `ehawk-repath-places` deploy builds the same exporter, but none of its tables is a member.
+* A member's schedule runs 5 minutes after the group time and every 8 hours after, in UTC, with no flexible window: `cron(5 5,13,21 * * ? *)` for 21:00. Other tables keep `rate(480 minutes)` with a 15-minute flexible window.
+
+#### Checking a member
+Read the member's `/incremental-export/<deployment-alias>-<table>/last-incremental-export-time` parameter, for example `/incremental-export/prd-us-dl-ingest-caseepisode/last-incremental-export-time`:
+
+* **On the group time:** the value ends at `T21:00:00` (milliseconds may follow) once the 21:05 run has started that day's export.
+* **Realigning:** after a full export, a table joining a group or a change of group time, the value is at another time of day. The next window ends at the group time, so the member is back on it by the next day's group time. A window that starts within 30 minutes before the group time takes two steps: the first ends 12 hours before the group time.
+* **Catching up:** a member that is off the group time and so far behind that the group time after its next one has already passed exports a full 24-hour window per run. Its value keeps its old time of day until it is no longer that far behind, and then it realigns.
+
+Each member run also writes one line to the time Lambda's log group, `/aws/vendedlogs/<deployment-alias>-<table>-incremental-export-time-manipulator-log-group`: `Sync group time 21:00 UTC, window <from> to <to>, ON_GROUP_TIME`, with `REALIGNING` or `CATCHING_UP` in place of `ON_GROUP_TIME` when that applies.
+
+#### Acting on a member
+* A full export of a member (`RESET_WITH_FULL_EXPORT_AGAIN`) needs no follow-up: the member is back on the group time by the next day's group time. For example, after a full export at 09:00 the next window runs from 09:00 to 21:00. After one at 20:50 the windows run from 20:50 to 09:00 the next day, then from 09:00 to 21:00.
+* To pause, resume or reset a member, set `workflow-action` and let the next scheduled run act. Starting the state machine by hand near a scheduled run can export the same window twice.
+* To change a group time, edit the file, merge and dispatch the deploy; the members move onto the new time by the next day. To remove a group, delete its entry, merge and dispatch: its members go back to `rate(480 minutes)`, and their windows keep chaining from the last stored export end, at whatever time of day that was.
+
 ### Security
 1. As the Step Functions are deployed using the CDK, the permissions assigned to the role assumed by the Step Function are scoped using the principle of least privilege. Also refer to the [Ensure long term success](#ensure-long-term-success) section.
 2. Encryption at rest has been enabled where appropriate along with any required rules to enforce communication via encrypted channels (i.e. TLS).
@@ -242,6 +266,8 @@ No worries. The full export flow will trigger automatically on the next schedule
 
 #### Incremental exports falling behind
 It may happen that your incremental exports fall behind new updates. For example, if you set the `workflow-action` state to `PAUSE` or if you stop the scheduler for any reason (which is [not recommended](#ensure-long-term-success)) and resume at a later date, the incremental exports will start from the time you paused. This will result in the value of `incrementalBlocksBehind` to be more than 0. If this happens the Step Function is designed to automatically recover as it is invoked (via the EventBridge Scheduler) more frequently than the specified Export Window Size (`incrementalExportWindowSizeInMinutes`), specifically 1/3 of the specified window size. E.g. if your window size is 30 minutes, the EventBridge Scheduler is setup to run every 10 minutes. This allows the exports to catch-up.
+
+A [sync group](#sync-groups) member that falls behind also exports one window per scheduled run, three a day. A member on the group time keeps every window ending at the group time. A member off the group time exports full 24-hour windows while it is [catching up](#checking-a-member), then one or two shorter windows to get back on the group time.
 
 #### Infrastructure was changed behind the scenes
 Improper changes to the infrastructure can often be fixed by redeploying, such as:
