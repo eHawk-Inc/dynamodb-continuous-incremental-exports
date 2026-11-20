@@ -35,6 +35,7 @@ export class NodeBuilder {
     private workflowActionParameterName: string;
 
     private incrementalExportWindowSizeInMinutes: number;
+    private syncGroupTimeUtc?: string;
     private waitTimeToCheckExportStatusInSeconds: number;
     private exportViewType: ExportViewType;
     private awsApiInvocationTaskTimeout: sfn.Timeout;
@@ -113,6 +114,7 @@ export class NodeBuilder {
         this.incrementalExportTimeManipulatorFunction = incrementalExportTimeManipulatorFunction;
 
         this.incrementalExportWindowSizeInMinutes = configuration.incrementalExportWindowSizeInMinutes;
+        this.syncGroupTimeUtc = configuration.syncGroupTimeUtc;
         this.waitTimeToCheckExportStatusInSeconds = configuration.waitTimeToCheckExportStatusInSeconds;
         this.exportViewType = configuration.exportViewType;
 
@@ -262,7 +264,9 @@ export class NodeBuilder {
                 'bucket': this.sourceDataExportBucket.bucket,
                 'bucketPrefix': this.sourceDataExportBucket.prefix,
                 'exportFormat': IncrementalExportDefaults.DATA_EXPORT_FORMAT,
-                'exportViewType': ExportViewType[this.exportViewType]
+                'exportViewType': ExportViewType[this.exportViewType],
+                // Members only, so every other table's definition stays as it was.
+                ...(this.syncGroupTimeUtc !== undefined ? { 'syncGroupTimeUtc': this.syncGroupTimeUtc } : {})
               }),
             resultPath: `$.${StepFunctionOutputConstants.GET_NEXT_INCREMENTAL_EXPORT_TIME_OUTPUT}`
           });
